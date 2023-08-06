@@ -8,7 +8,7 @@ const SHA256 = require("crypto-js/sha256");
 const base64 = require("crypto-js/enc-base64");
 const convertToBase64 = require("../Tools/convertToBase64");
 const isUserAuthentificated = require("../middelware/isUserAuthentificated");
-
+const axios = require("axios");
 router.post("/user/createaccount", fileUpload(), async (req, res) => {
   try {
     const { lastname, firstname, nickname, mail, password, dateOfBirth } =
@@ -82,10 +82,10 @@ router.post("/user/login", async (req, res) => {
     const { password, mail } = req.body;
     if (password && mail) {
       const findedUser = await User.findOne({ mail: mail.toUpperCase() });
-      console.log("OKK", findedUser);
+
       if (findedUser) {
         const newHash = SHA256(password + findedUser.salt).toString(base64);
-        console.log(newHash, findedUser.hash);
+
         if (newHash === findedUser.hash) {
           return res.status(200).json({
             message: "Vous êtes connecté(e)",
@@ -128,6 +128,8 @@ router.get("/favorites", isUserAuthentificated, async (req, res) => {
   try {
     const user = req.user;
     const favorites = {};
+    const favoritesCharacters = [];
+    const favoritesComics = [];
     if (user.favorites.characters.length !== 0) {
       const arrayOfCharacters = user.favorites.characters.map((character) => {
         return axios.get(
@@ -137,8 +139,13 @@ router.get("/favorites", isUserAuthentificated, async (req, res) => {
             process.env.MARVEL_API
         );
       });
-      const resulte = await promise.all(arrayOfCharacters);
-      favorites.characters = resulte;
+      const resulteCharacters = await Promise.all(arrayOfCharacters);
+
+      resulteCharacters.forEach((response) => {
+        favoritesCharacters.push(response.data);
+      });
+
+      favorites.characters = favoritesCharacters;
     } else {
       favorites.characters = [];
     }
@@ -151,13 +158,16 @@ router.get("/favorites", isUserAuthentificated, async (req, res) => {
             process.env.MARVEL_API
         );
       });
-      const resulte = await promise.all(arrayOfComics);
-      favorites.comics = resulte;
+      const resulteComics = await Promise.all(arrayOfComics);
+      resulteComics.forEach((response) => {
+        favoritesComics.push(response.data);
+      });
+
+      favorites.comics = favoritesComics;
     } else {
       favorites.comics = [];
     }
 
-    console.log(favorites);
     return res.status(200).json(favorites);
   } catch (error) {
     if (error.status) {
